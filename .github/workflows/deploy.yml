@@ -1,10 +1,20 @@
 name: Deploy OLED Inspection
 
 on:
+  workflow_run:
+    workflows: ["Python source checks"]
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: oled-production-deployment
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -12,15 +22,34 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
 
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Select tested commit
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          MANUAL_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            SHA="$TESTED_SHA"
+          else
+            SHA="$MANUAL_SHA"
+          fi
+
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER }}
           VM_HOST_KEY: ${{ secrets.VM_HOST_KEY }}
         run: |
           mkdir -p ~/.ssh
@@ -32,12 +61,28 @@ jobs:
           printf '%s\n' "$VM_HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy application
+      - name: Deploy tested commit
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
+          DEPLOY_SHA: ${{ steps.version.outputs.sha }}
         run: |
           ssh -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
             -i ~/.ssh/id_ed25519 \
             "$VM_USER@$VM_HOST" \
-            'bash ~/oled-inspection-repo/scripts/deploy.sh'
+            "bash -s -- '$DEPLOY_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          SHA="$1"
+          REPO="$HOME/oled-inspection-repo"
+
+          cd "$REPO"
+          test -z "$(git status --porcelain)"
+
+          git fetch origin main
+          git cat-file -e "$SHA^{commit}"
+          git checkout --detach "$SHA"
+
+          bash scripts/deploy.sh
+          REMOTE
