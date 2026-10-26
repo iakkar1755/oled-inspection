@@ -75,6 +75,10 @@ jobs:
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/id_ed25519 "$VM_USER@$VM_HOST" "bash -s -- '$DEPLOY_SHA'" <<'REMOTE'
           set -euo pipefail
 
+          echo "SSH user: $(whoami)"
+          echo "SSH home: $HOME"
+          sudo -n true && echo "SSH sudo: OK"
+
           SHA="$1"
           REPO="$HOME/oled-inspection-repo"
 
