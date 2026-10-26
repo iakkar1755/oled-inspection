@@ -67,11 +67,7 @@ jobs:
           VM_USER: ${{ secrets.VM_USER }}
           DEPLOY_SHA: ${{ steps.version.outputs.sha }}
         run: |
-          ssh -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -i ~/.ssh/id_ed25519 \
-            "$VM_USER@$VM_HOST" \
-            "bash -s -- '$DEPLOY_SHA'" <<'REMOTE'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/id_ed25519 "$VM_USER@$VM_HOST" "bash -s -- '$DEPLOY_SHA'" <<'REMOTE'
           set -euo pipefail
 
           SHA="$1"
