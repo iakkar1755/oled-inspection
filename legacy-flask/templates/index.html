@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>OLED Inspection System</title>
+
+     <!-- Load dashboard stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <!-- Main application title -->
+    <h1>OLED Vision Inspection System</h1>
+
+    <!-- Camera status -->
+    <h2>Camera Status: Connected</h2>
+
+    <!-- Live camera stream provided by Flask -->
+    <img
+        src="{{ url_for('video_feed') }}"
+        width="640"
+        alt="Live Camera Feed"
+    >
+
+    <br><br>
+    l
+    <!-- Start inspection button -->
+    <button id="inspectButton">Start Inspection</button>
+
+    <!-- Current inspection results -->
+    <h2>Inspection Results</h2>
+
+    <p>Mean Brightness: <span id="meanBrightness">-</span></p>
+    <p>Brightness STD: <span id="brightnessStd">-</span></p>
+    <p>Minimum Brightness: <span id="minBrightness">-</span></p>
+    <p>Maximum Brightness: <span id="maxBrightness">-</span></p>
+    <p>Uniformity Score: <span id="uniformityScore">-</span></p>
+    <h2>Inspection Status: <span id="inspectionStatus">-</span></h2>
+
+    <!-- PASS / FAIL result -->
+    <h2>Inspection Status: <span id="inspectionStatus">-</span></h2>
+
+    
+    <!-- Inspection history -->
+    <h2>Inspection History</h2>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Mean Brightness</th>
+                <th>STD</th>
+                <th>Min</th>
+                <th>Max</th>
+                <th>Uniformity</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody id="historyTableBody">
+            <!-- Inspection history will be inserted here by JavaScript. -->
+        </tbody>
+    </table>
+
+     <!-- Load dashboard JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+</body>
+
+</html>

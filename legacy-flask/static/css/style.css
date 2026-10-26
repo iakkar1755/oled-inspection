@@ -1,0 +1,84 @@
+/* =========================================================
+   OLED VISION INSPECTION SYSTEM - DASHBOARD STYLE
+   ========================================================= */
+
+
+/* Main page */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    color: #222;
+    margin: 0;
+    padding: 30px;
+}
+
+
+/* Main title */
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+
+/* Section titles */
+h2 {
+    margin-top: 20px;
+}
+
+
+/* Live camera */
+img {
+    border: 3px solid #333;
+    border-radius: 6px;
+}
+
+
+/* Start Inspection button */
+#inspectButton {
+    padding: 12px 25px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: #1f6feb;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+
+#inspectButton:hover {
+    background-color: #1857b6;
+}
+
+
+/* Inspection status */
+#inspectionStatus {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+
+/* Inspection history table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background-color: white;
+}
+
+th,
+td {
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #ccc;
+}
+
+th {
+    background-color: #333;
+    color: white;
+}
+
+
+/* Alternate table row colors */
+tbody tr:nth-child(even) {
+    background-color: #f0f0f0;
+}

@@ -11,3 +11,47 @@ instance/
 
 # VS Code
 .vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+data/images/
+
+# Backups
+*.save
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+data/images/
+
+# Backups
+*.save

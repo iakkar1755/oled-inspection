@@ -1,0 +1,299 @@
+
+cat > ~/oled-inspection-cloud/api/static/index.html <<'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OLED Inspection Dashboard</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f5f8;
+      margin: 30px;
+      color: #172033;
+    }
+
+    .cards {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      min-width: 150px;
+      margin-bottom: 15px;
+    }
+
+    .pass { color: green; font-weight: bold; }
+    .fail { color: red; font-weight: bold; }
+
+    .table-wrapper { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+
+    .preview {
+      width: 110px;
+      height: 75px;
+      object-fit: contain;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+
+    .muted { color: #777; }
+  </style>
+</head>
+
+<body>
+  <h1>OLED Inspection Dashboard</h1>
+  <p id="connection">Connecting to live events...</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Total Inspections</h3>
+      <h2 id="total">0</h2>
+    </div>
+
+    <div class="card">
+      <h3>Passed</h3>
+      <h2 id="passed">0</h2>
+    </div>
+
+    <div class="card">
+      <h3>Failed</h3>
+      <h2 id="failed">0</h2>
+    </div>
+
+    <div class="card">
+      <h3>Latest Result</h3>
+      <h2 id="latest">Waiting...</h2>
+    </div>
+  </div>
+
+  <h2>Inspection History</h2>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Date / Time</th>
+          <th>Brightness</th>
+          <th>Uniformity</th>
+          <th>Status</th>
+          <th>Image</th>
+        </tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const inspections = new Map();
+    let historyRequest = null;
+
+    function formatTimestamp(value) {
+      if (!value) return "N/A";
+
+      // Database timestamps without an offset are stored in UTC.
+      const normalized =
+        /(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+          ? value
+          : value + "Z";
+
+      const date = new Date(normalized);
+
+      return Number.isNaN(date.getTime())
+        ? "Invalid date"
+        : date.toLocaleString();
+    }
+
+    function createImageCell(record) {
+      const cell = document.createElement("td");
+      const link = document.createElement("a");
+      const image = document.createElement("img");
+      const imageUrl = `/api/inspections/${record.id}/image`;
+
+      link.href = imageUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+
+      image.alt = `Inspection ${record.id}`;
+      image.className = "preview";
+      image.loading = "lazy";
+
+      link.appendChild(image);
+      cell.appendChild(link);
+
+      // The image upload may finish after the SSE event.
+      const maxAttempts = 8;
+      let attempts = 0;
+
+      function loadImage() {
+        attempts += 1;
+
+        // Use a new URL to avoid caching a previous 404.
+        image.src = `${imageUrl}?attempt=${attempts}`;
+      }
+
+      image.onerror = () => {
+        if (!cell.isConnected) return;
+
+        if (attempts < maxAttempts) {
+          setTimeout(loadImage, 1500);
+        } else {
+          image.remove();
+          link.removeAttribute("href");
+          link.textContent = "No image";
+          link.className = "muted";
+        }
+      };
+
+      loadImage();
+      return cell;
+    }
+
+    function render() {
+      const records = [...inspections.values()]
+        .sort((a, b) => b.id - a.id);
+
+      document.getElementById("total").textContent =
+        records.length;
+
+      document.getElementById("passed").textContent =
+        records.filter(
+          r => r.inspection_status === "PASS"
+        ).length;
+
+      document.getElementById("failed").textContent =
+        records.filter(
+          r => r.inspection_status === "FAIL"
+        ).length;
+
+      const latest = records[0];
+      const latestEl = document.getElementById("latest");
+
+      latestEl.textContent = latest
+        ? latest.inspection_status
+        : "Waiting...";
+
+      latestEl.className = latest
+        ? latest.inspection_status.toLowerCase()
+        : "";
+
+      const tbody = document.getElementById("history");
+      tbody.replaceChildren();
+
+      for (const record of records.slice(0, 20)) {
+        const row = document.createElement("tr");
+
+        const values = [
+          record.id,
+          formatTimestamp(record.created_at),
+          record.mean_brightness,
+          record.uniformity_score,
+          record.inspection_status
+        ];
+
+        for (const value of values) {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+
+          if (value === "PASS") cell.className = "pass";
+          if (value === "FAIL") cell.className = "fail";
+
+          row.appendChild(cell);
+        }
+
+        row.appendChild(createImageCell(record));
+        tbody.appendChild(row);
+      }
+    }
+
+    async function loadHistory() {
+      if (historyRequest) return historyRequest;
+
+      historyRequest = (async () => {
+        try {
+          const response = await fetch(
+            "/api/inspections",
+            { cache: "no-store" }
+          );
+
+          if (!response.ok) {
+            throw new Error("History request failed");
+          }
+
+          const records = await response.json();
+
+          for (const record of records) {
+            // Preserve newer SSE data if it already exists.
+            if (!inspections.has(record.id)) {
+              inspections.set(record.id, record);
+            }
+          }
+
+          render();
+        } catch (error) {
+          console.error(
+            "Could not load inspection history:",
+            error
+          );
+        }
+      })();
+
+      try {
+        await historyRequest;
+      } finally {
+        historyRequest = null;
+      }
+    }
+
+    const events = new EventSource("/api/events");
+
+    events.onopen = () => {
+      document.getElementById("connection").textContent =
+        "Live: Connected";
+
+      // Recover events missed while disconnected.
+      loadHistory();
+    };
+
+    events.onmessage = (event) => {
+      try {
+        const record = JSON.parse(event.data);
+
+        if (!Number.isInteger(record.id)) return;
+
+        inspections.set(record.id, record);
+        render();
+      } catch (error) {
+        console.error("Invalid SSE event:", error);
+      }
+    };
+
+    events.onerror = () => {
+      document.getElementById("connection").textContent =
+        "Reconnecting...";
+    };
+
+    // Load saved inspections when the page first opens.
+    loadHistory();
+  </script>
+</body>
+</html>
+EOF

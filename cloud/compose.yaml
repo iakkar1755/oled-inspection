@@ -1,0 +1,24 @@
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: oled-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  api:
+    build: ./api
+    container_name: oled-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/app/data
+volumes:
+  redis_data:
