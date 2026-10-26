@@ -1,0 +1,25 @@
+name: Python source checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check Python syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          roots = [Path('local'), Path('cloud/api'), Path('legacy-flask')]
+          files = [p for root in roots if root.exists() for p in root.rglob('*.py')]
+          for path in files:
+              ast.parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
+          print(f'Checked {len(files)} Python files')
+          PY
